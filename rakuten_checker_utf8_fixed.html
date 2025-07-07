@@ -6,18 +6,36 @@
   <style>
     body { font-family: sans-serif; padding: 20px; }
     button { margin: 10px 0; padding: 10px 20px; font-size: 16px; }
+    #log { margin-top: 20px; }
+    .log-entry { margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
   </style>
 </head>
 <body>
   <h1>楽天ブックス通知チェッカー</h1>
-  <p>以下のボタンを押して通知を許可してください。</p>
   <button id="permissionBtn">🔔 通知を許可する</button>
   <button id="testBtn">🧪 通知テスト</button>
   <p>30秒ごとに商品状態をチェックします。</p>
+  <div id="log"></div>
 
   <script>
     const url = "https://books.rakuten.co.jp/rb/18210487/";
     let lastStatus = null;
+
+    function getJapanTimeString() {
+      const now = new Date();
+      const japanOffset = 9 * 60; // JST is UTC+9
+      const localOffset = now.getTimezoneOffset();
+      const japanTime = new Date(now.getTime() + (japanOffset + localOffset) * 60000);
+      return japanTime.toLocaleString("ja-JP", { hour12: false });
+    }
+
+    function logStatus(statusText) {
+      const logDiv = document.getElementById("log");
+      const entry = document.createElement("div");
+      entry.className = "log-entry";
+      entry.textContent = `[${getJapanTimeString()}] 状態: ${statusText}`;
+      logDiv.insertBefore(entry, logDiv.firstChild);
+    }
 
     document.getElementById("permissionBtn").addEventListener("click", () => {
       if (!("Notification" in window)) {
@@ -36,16 +54,20 @@
 
     document.getElementById("testBtn").addEventListener("click", () => {
       if (Notification.permission === "granted") {
-        const notification = new Notification("テスト通知", {
-          body: "これは通知機能のテストです。",
-          icon: "https://books.rakuten.co.jp/favicon.ico",
-          data: { url: url }
-        });
+        try {
+          const notification = new Notification("テスト通知", {
+            body: "これは通知機能のテストです。",
+            icon: "https://books.rakuten.co.jp/favicon.ico",
+            data: { url: url }
+          });
 
-        notification.onclick = function(event) {
-          event.preventDefault();
-          window.open(notification.data.url, "_blank");
-        };
+          notification.onclick = function(event) {
+            event.preventDefault();
+            window.open(notification.data.url, "_blank");
+          };
+        } catch (e) {
+          alert("通知の送信に失敗しました。");
+        }
       } else {
         alert("通知が許可されていません。先に通知を許可してください。");
       }
@@ -61,7 +83,7 @@
         const statusElement = doc.querySelector(".availability, .salesStatus, .stockStatus");
         const statusText = statusElement ? statusElement.textContent.trim() : "状態不明";
 
-        console.log("現在の状態:", statusText);
+        logStatus(statusText);
 
         if (Notification.permission === "granted" && statusText !== lastStatus) {
           lastStatus = statusText;
@@ -78,6 +100,7 @@
         }
       } catch (err) {
         console.error("エラー:", err);
+        logStatus("チェック失敗");
       }
     }
 
