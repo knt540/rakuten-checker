@@ -11,15 +11,15 @@
 <body>
   <h1>楽天ブックス通知チェッカー</h1>
   <p>以下のボタンを押して通知を許可してください。</p>
-  <button onclick="requestNotificationPermission()">🔔 通知を許可する</button>
-  <button onclick="sendTestNotification()">🧪 通知テスト</button>
+  <button id="permissionBtn">🔔 通知を許可する</button>
+  <button id="testBtn">🧪 通知テスト</button>
   <p>30秒ごとに商品状態をチェックします。</p>
 
   <script>
     const url = "https://books.rakuten.co.jp/rb/18210487/";
     let lastStatus = null;
 
-    function requestNotificationPermission() {
+    document.getElementById("permissionBtn").addEventListener("click", () => {
       if (!("Notification" in window)) {
         alert("このブラウザは通知に対応していません。");
         return;
@@ -32,9 +32,9 @@
           alert("通知が許可されませんでした。");
         }
       });
-    }
+    });
 
-    function sendTestNotification() {
+    document.getElementById("testBtn").addEventListener("click", () => {
       if (Notification.permission === "granted") {
         const notification = new Notification("テスト通知", {
           body: "これは通知機能のテストです。",
@@ -49,7 +49,7 @@
       } else {
         alert("通知が許可されていません。先に通知を許可してください。");
       }
-    }
+    });
 
     async function checkStatus() {
       try {
