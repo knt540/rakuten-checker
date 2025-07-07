@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>楽天ブックス通知チェッカー</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h1>楽天ブックス通知チェッカー</h1>
+  <p>通知を有効にするには、以下のボタンを押してください。</p>
+  <button onclick="requestNotificationPermission()">通知を許可する</button>
+
+  <script>
+    const url = "https://books.rakuten.co.jp/rb/18210487/";
+    let lastStatus = null;
+
+    function requestNotificationPermission() {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          alert("通知が許可されました。商品状態の変化を監視します。");
+        } else {
+          alert("通知が許可されませんでした。ブラウザの設定をご確認ください。");
+        }
+      });
+    }
+
+    async function checkStatus() {
+      try {
+        const response = await fetch(url);
+        const text = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, "text/html");
+
+        const statusElement = doc.querySelector(".availability, .salesStatus, .stockStatus");
+        const statusText = statusElement ? statusElement.textContent.trim() : "状態不明";
+
+        console.log("現在の状態:", statusText);
+
+        if (Notification.permission === "granted" && statusText !== lastStatus) {
+          lastStatus = statusText;
+          new Notification("楽天ブックス商品状態が変化！", {
+            body: statusText,
+            icon: "https://books.rakuten.co.jp/favicon.ico",
+            data: { url: url }
+          });
+        }
+      } catch (err) {
+        console.error("エラー:", err);
+      }
+    }
+
+    // 通知クリックで商品ページへ
+    self.addEventListener("notificationclick", function(event) {
+      event.notification.close();
+      window.open(event.notification.data.url, "_blank");
+    });
+
+    // 30秒ごとにチェック
+    setInterval(checkStatus, 30000);
+    checkStatus();
+  </script>
+</body>
+</html>
