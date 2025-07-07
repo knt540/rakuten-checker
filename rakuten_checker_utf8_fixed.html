@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -19,7 +20,7 @@
 
   <script>
     const url = "https://books.rakuten.co.jp/rb/18210487/";
-    let lastStatus = null;
+    let lastStatus = "unavailable";
 
     function getJapanTimeString() {
       const now = new Date();
@@ -29,81 +30,69 @@
       return japanTime.toLocaleString("ja-JP", { hour12: false });
     }
 
-    function logStatus(statusText) {
+    function logStatus(message) {
       const logDiv = document.getElementById("log");
       const entry = document.createElement("div");
       entry.className = "log-entry";
-      entry.textContent = `[${getJapanTimeString()}] 状態: ${statusText}`;
+      entry.textContent = `[${getJapanTimeString()}] ${message}`;
       logDiv.insertBefore(entry, logDiv.firstChild);
     }
 
     document.getElementById("permissionBtn").addEventListener("click", () => {
-      if (!("Notification" in window)) {
-        alert("このブラウザは通知に対応していません。");
-        return;
-      }
-
       Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          alert("通知が許可されました！");
-        } else {
-          alert("通知が許可されませんでした。");
-        }
+        alert(permission === "granted" ? "通知が許可されました！" : "通知が許可されませんでした。");
       });
     });
 
     document.getElementById("testBtn").addEventListener("click", () => {
-      if (!("Notification" in window)) {
-        alert("このブラウザは通知に対応していません。");
-        return;
-      }
-
-      if (Notification.permission === "granted") {
-        try {
+      try {
+        if (Notification.permission === "granted") {
           const notification = new Notification("テスト通知", {
             body: "これは通知機能のテストです。",
             icon: "https://books.rakuten.co.jp/favicon.ico",
             data: { url: url }
           });
-
-          notification.onclick = function(event) {
-            event.preventDefault();
+          notification.onclick = e => {
+            e.preventDefault();
             window.open(notification.data.url, "_blank");
           };
-        } catch (e) {
-          alert("通知の送信に失敗しました: " + e.message);
+        } else {
+          alert("通知が許可されていません。先に通知を許可してください。");
         }
-      } else {
-        alert("通知が許可されていません。先に通知を許可してください。");
+      } catch (err) {
+        alert("通知の送信に失敗しました: " + err.message);
       }
     });
 
     async function checkStatus() {
       try {
-        const response = await fetch(url, { mode: 'cors' });
+        const response = await fetch(url);
         const text = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, "text/html");
-        const statusElement = doc.querySelector(".availability, .salesStatus, .stockStatus");
-        const statusText = statusElement ? statusElement.textContent.trim() : "状態不明";
-        logStatus(statusText);
+        const isUnavailable = text.includes("ご注文できない商品");
+        const isAvailable = text.includes("カートに入れる");
 
-        if (Notification.permission === "granted" && statusText !== lastStatus) {
-          lastStatus = statusText;
-          try {
-            const notification = new Notification("楽天ブックス商品状態が変化！", {
-              body: statusText,
-              icon: "https://books.rakuten.co.jp/favicon.ico",
-              data: { url: url }
-            });
-
-            notification.onclick = function(event) {
-              event.preventDefault();
-              window.open(notification.data.url, "_blank");
-            };
-          } catch (e) {
-            console.error("通知送信エラー:", e);
+        if (!isUnavailable || isAvailable) {
+          if (lastStatus === "unavailable") {
+            lastStatus = "available";
+            logStatus("状態変化：カートに入れる可能性あり");
+            if (Notification.permission === "granted") {
+              const notification = new Notification("楽天ブックス商品状態が変化！", {
+                body: "カートに入れる可能性があります。",
+                icon: "https://books.rakuten.co.jp/favicon.ico",
+                data: { url: url }
+              });
+              notification.onclick = e => {
+                e.preventDefault();
+                window.open(notification.data.url, "_blank");
+              };
+            }
+            window.location.href = url;
+          } else {
+            logStatus("チェック完了（状態変化なし）");
           }
+        } else {
+          lastStatus = "unavailable";
+          logStatus("チェック完了（在庫なし）");
         }
       } catch (err) {
         console.error("チェック失敗:", err);
