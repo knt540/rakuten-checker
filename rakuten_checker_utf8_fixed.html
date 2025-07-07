@@ -20,6 +20,11 @@
     let lastStatus = null;
 
     function requestNotificationPermission() {
+      if (!("Notification" in window)) {
+        alert("このブラウザは通知に対応していません。");
+        return;
+      }
+
       Notification.requestPermission().then(permission => {
         if (permission === "granted") {
           alert("通知が許可されました！");
@@ -31,11 +36,16 @@
 
     function sendTestNotification() {
       if (Notification.permission === "granted") {
-        new Notification("テスト通知", {
+        const notification = new Notification("テスト通知", {
           body: "これは通知機能のテストです。",
           icon: "https://books.rakuten.co.jp/favicon.ico",
           data: { url: url }
         });
+
+        notification.onclick = function(event) {
+          event.preventDefault();
+          window.open(notification.data.url, "_blank");
+        };
       } else {
         alert("通知が許可されていません。先に通知を許可してください。");
       }
@@ -55,23 +65,21 @@
 
         if (Notification.permission === "granted" && statusText !== lastStatus) {
           lastStatus = statusText;
-          new Notification("楽天ブックス商品状態が変化！", {
+          const notification = new Notification("楽天ブックス商品状態が変化！", {
             body: statusText,
             icon: "https://books.rakuten.co.jp/favicon.ico",
             data: { url: url }
           });
+
+          notification.onclick = function(event) {
+            event.preventDefault();
+            window.open(notification.data.url, "_blank");
+          };
         }
       } catch (err) {
         console.error("エラー:", err);
       }
     }
-
-    self.addEventListener("notificationclick", function(event) {
-      event.notification.close();
-      if (event.notification.data && event.notification.data.url) {
-        window.open(event.notification.data.url, "_blank");
-      }
-    });
 
     setInterval(checkStatus, 30000);
     checkStatus();
