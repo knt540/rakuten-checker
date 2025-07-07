@@ -14,7 +14,7 @@
   <h1>楽天ブックス通知チェッカー</h1>
   <button id="permissionBtn">🔔 通知を許可する</button>
   <button id="testBtn">🧪 通知テスト</button>
-  <p>30秒ごとに商品状態をチェックします。</p>
+  <p>毎分「00秒」「30秒」に商品状態をチェックします。</p>
   <div id="log"></div>
 
   <script>
@@ -23,7 +23,7 @@
 
     function getJapanTimeString() {
       const now = new Date();
-      const japanOffset = 9 * 60; // JST is UTC+9
+      const japanOffset = 9 * 60;
       const localOffset = now.getTimezoneOffset();
       const japanTime = new Date(now.getTime() + (japanOffset + localOffset) * 60000);
       return japanTime.toLocaleString("ja-JP", { hour12: false });
@@ -53,6 +53,11 @@
     });
 
     document.getElementById("testBtn").addEventListener("click", () => {
+      if (!("Notification" in window)) {
+        alert("このブラウザは通知に対応していません。");
+        return;
+      }
+
       if (Notification.permission === "granted") {
         try {
           const notification = new Notification("テスト通知", {
@@ -66,7 +71,7 @@
             window.open(notification.data.url, "_blank");
           };
         } catch (e) {
-          alert("通知の送信に失敗しました。");
+          alert("通知の送信に失敗しました: " + e.message);
         }
       } else {
         alert("通知が許可されていません。先に通知を許可してください。");
@@ -75,37 +80,51 @@
 
     async function checkStatus() {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { mode: 'cors' });
         const text = await response.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(text, "text/html");
-
         const statusElement = doc.querySelector(".availability, .salesStatus, .stockStatus");
         const statusText = statusElement ? statusElement.textContent.trim() : "状態不明";
-
         logStatus(statusText);
 
         if (Notification.permission === "granted" && statusText !== lastStatus) {
           lastStatus = statusText;
-          const notification = new Notification("楽天ブックス商品状態が変化！", {
-            body: statusText,
-            icon: "https://books.rakuten.co.jp/favicon.ico",
-            data: { url: url }
-          });
+          try {
+            const notification = new Notification("楽天ブックス商品状態が変化！", {
+              body: statusText,
+              icon: "https://books.rakuten.co.jp/favicon.ico",
+              data: { url: url }
+            });
 
-          notification.onclick = function(event) {
-            event.preventDefault();
-            window.open(notification.data.url, "_blank");
-          };
+            notification.onclick = function(event) {
+              event.preventDefault();
+              window.open(notification.data.url, "_blank");
+            };
+          } catch (e) {
+            console.error("通知送信エラー:", e);
+          }
         }
       } catch (err) {
-        console.error("エラー:", err);
+        console.error("チェック失敗:", err);
         logStatus("チェック失敗");
       }
     }
 
-    setInterval(checkStatus, 30000);
-    checkStatus();
+    function scheduleNextCheck() {
+      const now = new Date();
+      const seconds = now.getSeconds();
+      const delay = seconds < 30
+        ? (30 - seconds) * 1000
+        : (60 - seconds) * 1000;
+
+      setTimeout(() => {
+        checkStatus();
+        scheduleNextCheck();
+      }, delay);
+    }
+
+    scheduleNextCheck();
   </script>
 </body>
 </html>
